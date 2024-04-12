@@ -13,11 +13,12 @@ on:
 
 jobs:
   trigger_crawler:
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04
+    permissions: {}
+    timeout-minutes: 1
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde6  # v4
 
       - name: Trigger Algolia Crawler
         run: |

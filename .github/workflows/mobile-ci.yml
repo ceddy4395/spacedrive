@@ -32,10 +32,12 @@ concurrency:
 jobs:
   js:
     name: JS
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    permissions: {}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde6  # v4
 
       - name: Setup Node.js, pnpm and dependencies
         uses: ./.github/actions/setup-pnpm
@@ -51,7 +53,7 @@ jobs:
   #   runs-on: macos-12
   #   steps:
   #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@b4ffde6  #v4
   #
   #     - name: Setup Java JDK
   #       uses: actions/setup-java@v3.10.0
@@ -139,9 +141,11 @@ jobs:
   ios:
     name: iOS
     runs-on: macos-12
+    timeout-minutes: 120
+    permissions: {}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde6  # v4
 
       # - name: Install Xcode
       #   uses: maxim-lobanov/setup-xcode@v1
@@ -166,7 +170,7 @@ jobs:
       # Hermes doesn't work with Cocoapods 1.15.0
       # https://forums.developer.apple.com/forums/thread/745518
       - name: Setup Cocoapods
-        uses: maxim-lobanov/setup-cocoapods@v1
+        uses: maxim-lobanov/setup-cocoapods@8e97e1e  # v1
         with:
           version: latest
 
@@ -191,13 +195,16 @@ jobs:
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
-          brew tap facebook/fb
-          brew install facebook/fb/idb-companion
-          echo "${HOME}/.maestro/bin" >> $GITHUB_PATH
+      - name: Tap facebook
+        run: brew tap facebook/fb
+      - name: Install facebook idb-companion
+        run: brew install facebook/fb/idb-companion@1.1.8
+      - name: Add maestro bin to path
+        run: echo "${HOME}/.maestro/bin" >> $GITHUB_PATH
 
       - name: Run Simulator
         id: run_simulator
-        uses: futureware-tech/simulator-action@v3
+        uses: futureware-tech/simulator-action@bfa03d9  # v3
         with:
           model: 'iPhone 14'
           os_version: 16

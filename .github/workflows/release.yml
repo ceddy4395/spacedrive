@@ -37,19 +37,22 @@ jobs:
             bundles: deb
             os: linux
             arch: x86_64
-          # - host: ubuntu-20.04
-          #   target: x86_64-unknown-linux-musl
-          # - host: ubuntu-20.04
-          #   target: aarch64-unknown-linux-gnu
-          #   bundles: deb
-          # - host: ubuntu-20.04
-          #   target: aarch64-unknown-linux-musl
+            # - host: ubuntu-20.04
+            #   target: x86_64-unknown-linux-musl
+            # - host: ubuntu-20.04
+            #   target: aarch64-unknown-linux-gnu
+            #   bundles: deb
+            # - host: ubuntu-20.04
+            #   target: aarch64-unknown-linux-musl
     name: Desktop - Main ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
+    permissions:
+      actions: write
+    timeout-minutes: 90
     steps:
       - name: Maximize build space
         if: ${{ runner.os == 'Linux' }}
-        uses: easimon/maximize-build-space@master
+        uses: easimon/maximize-build-space@fc881a6  # master
         with:
           swap-size-mb: 3072
           root-reserve-mb: 6144
@@ -63,19 +66,33 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path C:\spacedrive_target
+      - name: Symlint target to C:\
+        if: ${{ runner.os == 'Windows' }}
+        shell: powershell
+        run: |
           New-Item -Path target -ItemType Junction -Value C:\spacedrive_target
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde6  # v4
 
-      - name: Install Apple API key
+      - name: Create private keys folder
         if: ${{ runner.os == 'macOS' }}
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys/
-          cd ~/.appstoreconnect/private_keys/
-          echo ${{ secrets.APPLE_API_KEY_BASE64 }} >> AuthKey_${{ secrets.APPLE_API_KEY }}.p8.base64
-          base64 --decode -i AuthKey_${{ secrets.APPLE_API_KEY }}.p8.base64 -o AuthKey_${{ secrets.APPLE_API_KEY }}.p8
-          rm AuthKey_${{ secrets.APPLE_API_KEY }}.p8.base64
+        run: mkdir -p ~/.appstoreconnect/private_keys/
+
+      - name: Add key to keyfile
+        if: ${{ runner.os == 'macOS' }}
+        working-directory: ~/.appstoreconnect/private_keys/
+        run: echo ${{ secrets.APPLE_API_KEY_BASE64 }} >> AuthKey_${{ secrets.APPLE_API_KEY }}.p8.base64
+
+      - name: Base64 decode key
+        if: ${{ runner.os == 'macOS' }}
+        working-directory: ~/.appstoreconnect/private_keys/
+        run: base64 --decode -i AuthKey_${{ secrets.APPLE_API_KEY }}.p8.base64 -o AuthKey_${{ secrets.APPLE_API_KEY }}.p8
+
+      - name: Remove encoded key
+        if: ${{ runner.os == 'macOS' }}
+        working-directory: ~/.appstoreconnect/private_keys/
+        run: rm AuthKey_${{ secrets.APPLE_API_KEY }}.p8.base64
 
       - name: Install Codesigning Certificate
         if: ${{ runner.os == 'macOS' }}
@@ -114,13 +131,11 @@ jobs:
 
       - name: Build AppImage in Docker
         if: ${{ runner.os == 'Linux' && ( matrix.settings.target == 'x86_64-unknown-linux-gnu' || matrix.settings.target == 'aarch64-unknown-linux-gnu' ) }}
-        run: |
-          set -euxo pipefail
-          docker run --rm -v $(pwd):/srv -e 'CI=true' -e 'TARGET=${{ matrix.settings.target }}' -w /srv debian:bookworm scripts/appimage/build_appimage.sh
-          cd 'target/${{ matrix.settings.target }}/release/bundle/appimage'
-          sudo chown "$(id -u):$(id -g)" -R .
-          tar -czf Updater.AppImage.tar.gz *.AppImage
-          pnpm tauri signer sign -k '${{ secrets.TAURI_PRIVATE_KEY }}' -p '${{ secrets.TAURI_KEY_PASSWORD }}' "$(pwd)/Updater.AppImage.tar.gz"
+        run: .github/workflows/scripts/build-image-docker.sh
+        env:
+          TARGET: ${{ matrix.settings.target }}
+          TAURI_PRIVATE_KEY: ${{secrets.TAURI_PRIVATE_KEY}}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
       - name: Publish Artifacts
         uses: ./.github/actions/publish-artifacts
@@ -132,14 +147,15 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     name: Create Release
     needs: desktop-main
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@c850b93  # v4
 
       - name: Create Release
         # TODO: Change to stable version when available
